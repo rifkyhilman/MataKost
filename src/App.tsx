@@ -16,6 +16,23 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('masuk');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('matakost_theme') as 'light' | 'dark') || 'dark';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('matakost_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   // Check active session on mount
   useEffect(() => {
@@ -144,7 +161,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-surface flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0A0A0A] text-zinc-900 dark:text-white flex flex-col antialiased selection:bg-blue-100 dark:selection:bg-blue-900/30 selection:text-blue-900 dark:selection:text-blue-200 transition-colors duration-300">
       {/* Top Desktop Navigation Bar */}
       {user && activeTab !== 'masuk' && (
         <Header 
@@ -152,6 +169,8 @@ export default function App() {
           setActiveTab={setActiveTab} 
           user={user} 
           onLogout={handleLogout}
+          theme={theme}
+          toggleTheme={toggleTheme}
         />
       )}
 
