@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ActiveTab, Order, OrderStatus, UserProfile } from './types';
-import { INITIAL_PROFILE, INITIAL_ORDERS } from './initialData';
+import { INITIAL_ORDERS } from './initialData';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import HomeScreen from './components/HomeScreen';
@@ -9,30 +9,43 @@ import TrackingScreen from './components/TrackingScreen';
 import ReportScreen from './components/ReportScreen';
 import ProfileScreen from './components/ProfileScreen';
 import Footer from './components/Footer';
+import { api } from './services/api';
 
 export default function App() {
-  // Initialize states with localStorage persistence
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('matakost_user');
-    return saved ? JSON.parse(saved) : INITIAL_PROFILE;
-  });
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     const saved = localStorage.getItem('matakost_orders');
     return saved ? JSON.parse(saved) : INITIAL_ORDERS;
   });
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('beranda');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('masuk');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  // Sync to localStorage when state changes
+  // Check active session on mount
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('matakost_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('matakost_user');
-    }
-  }, [user]);
+    const checkSession = async () => {
+      const token = api.getToken();
+      if (token) {
+        try {
+          const data = await api.getMe();
+          setUser(data.user);
+          setActiveTab('beranda');
+        } catch (error) {
+          console.error('Verifikasi sesi gagal:', error);
+          api.clearToken();
+          setUser(null);
+          setActiveTab('masuk');
+        }
+      } else {
+        setUser(null);
+        setActiveTab('masuk');
+      }
+      setIsLoadingSession(false);
+    };
+    checkSession();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('matakost_orders', JSON.stringify(orders));
@@ -40,6 +53,7 @@ export default function App() {
 
   // Handle logging out
   const handleLogout = () => {
+    api.clearToken();
     setUser(null);
     setActiveTab('masuk');
   };
@@ -142,6 +156,23 @@ export default function App() {
   };
 
   const selectedOrder = orders.find(o => o.id === selectedOrderId) || orders[0] || null;
+
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center text-white font-sans">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative flex items-center justify-center w-16 h-16">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500/20 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-8 w-8 bg-blue-600"></span>
+          </div>
+          <div className="text-center flex flex-col gap-1.5">
+            <h2 className="text-xl font-bold tracking-wider font-mono">MATAKOST OS</h2>
+            <p className="text-xs text-zinc-500 font-mono tracking-widest uppercase">Memverifikasi Sesi...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">

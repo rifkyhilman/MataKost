@@ -1,37 +1,92 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { UserProfile } from '../types';
+import { api } from '../services/api';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserProfile) => void;
 }
 
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
-  const [email, setEmail] = useState('stn.it.productowner@gmail.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [name, setName] = useState('Rifki Hilman');
-  const [occupation, setOccupation] = useState('Mahasiswa S2');
+  const [name, setName] = useState('');
+  const [occupation, setOccupation] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  // Initialize Google SDK if Client ID is configured
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if (typeof window !== 'undefined' && (window as any).google) {
+        const google = (window as any).google;
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        
+        if (clientId && !clientId.includes('YOUR_GOOGLE_CLIENT_ID') && clientId !== '') {
+          google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+          });
+
+          const container = document.getElementById("google-signin-button-container");
+          if (container) {
+            container.innerHTML = ''; // Clear container
+            google.accounts.id.renderButton(container, {
+              theme: "dark",
+              size: "large",
+              width: 360,
+              shape: "pill",
+              text: "continue_with",
+              logo_alignment: "left"
+            });
+          }
+        }
+      }
+    };
+
+    initializeGoogle();
+    const timer = setTimeout(initializeGoogle, 1000);
+    return () => clearTimeout(timer);
+  }, [isRegisterMode]);
+
+  const handleGoogleCredentialResponse = async (response: any) => {
+    try {
+      setErrorMessage('');
+      const data = await api.googleLogin(response.credential);
+      api.setToken(data.token);
+      onLoginSuccess(data.user);
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      setErrorMessage(error.message || "Gagal login dengan Google.");
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    onLoginSuccess({
-      name,
-      occupation,
-      avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCqK2UJcHiK79yL-vulfQKOoPG7hf5yJSg9ITEWVsUBsKTiuojqG63NpmIhN08DgA6sC9NmCrxiUY9wH-5gkcuHUyI9Yc6pAiU_uThCjYCKP7gn9dcihvU7ZsLuONNeitj_uvaJ32ptKamZq9eCKcQTEBRjmSHcCl0olhavml140IKdOkAMYIsr1bSaUGPz_SY9PoSj2i42QGu24D4bu7-qJIlElCrskNLuMgCNVWlb3x6VWE5QBOk-v2bqh5aCf6C5Z2E93peHFHgW",
-      email: email || "stn.it.productowner@gmail.com"
-    });
+    setErrorMessage('');
+    
+    try {
+      if (isRegisterMode) {
+        const data = await api.register(name, email, password, occupation);
+        api.setToken(data.token);
+        onLoginSuccess(data.user);
+      } else {
+        const data = await api.login(email, password);
+        api.setToken(data.token);
+        onLoginSuccess(data.user);
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      setErrorMessage(error.message || "Terjadi kesalahan autentikasi.");
+    }
   };
 
   const handleGoogleLogin = () => {
-    onLoginSuccess({
-      name: "Rifki Hilman",
-      occupation: "Mahasiswa S2",
-      avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCqK2UJcHiK79yL-vulfQKOoPG7hf5yJSg9ITEWVsUBsKTiuojqG63NpmIhN08DgA6sC9NmCrxiUY9wH-5gkcuHUyI9Yc6pAiU_uThCjYCKP7gn9dcihvU7ZsLuONNeitj_uvaJ32ptKamZq9eCKcQTEBRjmSHcCl0olhavml140IKdOkAMYIsr1bSaUGPz_SY9PoSj2i42QGu24D4bu7-qJIlElCrskNLuMgCNVWlb3x6VWE5QBOk-v2bqh5aCf6C5Z2E93peHFHgW",
-      email: "stn.it.productowner@gmail.com"
-    });
+    setErrorMessage("Fitur Google Sign-In tidak dapat digunakan karena VITE_GOOGLE_CLIENT_ID belum diatur pada berkas .env.");
   };
+
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const isGoogleConfigured = !!(clientId && !clientId.includes('YOUR_GOOGLE_CLIENT_ID') && clientId !== '');
 
   return (
     <div className="w-full min-h-[calc(100vh-80px)] flex flex-col md:flex-row overflow-hidden relative bg-[#0A0A0A]">
@@ -202,18 +257,22 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </div>
 
           {/* Social Google Sign in */}
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full bg-zinc-900 border border-zinc-800 text-white py-3.5 rounded-full font-bold text-sm md:text-base flex justify-center items-center gap-3 hover:bg-zinc-800 transition-all active:scale-[0.98]"
-            type="button"
-          >
-            <img 
-              alt="Google Logo" 
-              className="w-5 h-5 object-contain" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCho4IabZmCh3SjuL_VRxZupP58_8Nl__-qTt_OgIMWwDYMA1_A5yYXl-fgWRirOD5nVKyHk9LgEbVsoGc12sb1DHqjyokPMHHAj2v16uKJcULGpY63jQBneR0EZy_H0VVoW6uJK_GuyWrbjEj36SfEF8picfiU4SHuh8QrcGH3DogHacYBPeytSG2jmsmkQaVnO1Ln793OfPZQoJOH6GxcrJybzxnsHuxK6ocWbGrGGH04UShXTaIf0g9kg1-CRRqHP6l-fHrf2uIu" 
-            />
-            <span>Lanjutkan dengan Google</span>
-          </button>
+          {isGoogleConfigured ? (
+            <div id="google-signin-button-container" className="w-full mt-2 flex justify-center"></div>
+          ) : (
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full bg-zinc-900 border border-zinc-800 text-white py-3.5 rounded-full font-bold text-sm md:text-base flex justify-center items-center gap-3 hover:bg-zinc-800 transition-all active:scale-[0.98]"
+              type="button"
+            >
+              <img 
+                alt="Google Logo" 
+                className="w-5 h-5 object-contain" 
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCho4IabZmCh3SjuL_VRxZupP58_8Nl__-qTt_OgIMWwDYMA1_A5yYXl-fgWRirOD5nVKyHk9LgEbVsoGc12sb1DHqjyokPMHHAj2v16uKJcULGpY63jQBneR0EZy_H0VVoW6uJK_GuyWrbjEj36SfEF8picfiU4SHuh8QrcGH3DogHacYBPeytSG2jmsmkQaVnO1Ln793OfPZQoJOH6GxcrJybzxnsHuxK6ocWbGrGGH04UShXTaIf0g9kg1-CRRqHP6l-fHrf2uIu" 
+              />
+              <span>Lanjutkan dengan Google</span>
+            </button>
+          )}
 
           {/* Toggle Register / Login */}
           <div className="text-center mt-2">
