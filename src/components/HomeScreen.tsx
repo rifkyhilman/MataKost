@@ -10,28 +10,71 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ user, orders, onRequestSurvey, onSelectOrder, onViewReport }: HomeScreenProps) {
+  const [formTab, setFormTab] = useState<'existing' | 'discover'>('existing');
   const [gmapsLink, setGmapsLink] = useState('');
   const [notes, setNotes] = useState('');
+  const [campusArea, setCampusArea] = useState('');
+  const [budgetRange, setBudgetRange] = useState('');
+  const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const facilityOptions = [
+    'AC',
+    'Kamar Mandi Dalam',
+    'WiFi Cepat',
+    'Kasur & Lemari',
+    'Parkir Mobil',
+    'Dapur Bersama',
+    'Akses 24 Jam'
+  ];
 
   const activeOrders = orders.filter(o => o.status !== 'completed');
   const pastOrders = orders.filter(o => o.status === 'completed');
 
+  const toggleFacility = (facility: string) => {
+    setSelectedFacilities(prev => 
+      prev.includes(facility) 
+        ? prev.filter(f => f !== facility) 
+        : [...prev, facility]
+    );
+  };
+
   const handleRequestClick = (e: FormEvent) => {
     e.preventDefault();
-    if (!gmapsLink.trim()) {
-      setErrorMsg('Harap masukkan Link Google Maps atau Nama Kos terlebih dahulu.');
-      return;
+    if (formTab === 'existing') {
+      if (!gmapsLink.trim()) {
+        setErrorMsg('Harap masukkan Link Google Maps atau Nama Kos terlebih dahulu.');
+        return;
+      }
+      setErrorMsg('');
+      setShowPaymentModal(true);
+    } else {
+      if (!campusArea) {
+        setErrorMsg('Harap pilih area kampus terlebih dahulu.');
+        return;
+      }
+      if (!budgetRange) {
+        setErrorMsg('Harap pilih rentang budget terlebih dahulu.');
+        return;
+      }
+      setErrorMsg('');
+      
+      const targetGmaps = `Survei Area ${campusArea}`;
+      const targetNotes = `Minta carikan kos di sekitar area ${campusArea}.\nRentang Budget: ${budgetRange}.\nFasilitas Prioritas: ${selectedFacilities.length > 0 ? selectedFacilities.join(', ') : 'Tidak ada catatan fasilitas khusus'}.`;
+      setGmapsLink(targetGmaps);
+      setNotes(targetNotes);
+      setShowPaymentModal(true);
     }
-    setErrorMsg('');
-    setShowPaymentModal(true);
   };
 
   const handlePaymentConfirm = () => {
     onRequestSurvey(gmapsLink, notes);
     setGmapsLink('');
     setNotes('');
+    setCampusArea('');
+    setBudgetRange('');
+    setSelectedFacilities([]);
     setShowPaymentModal(false);
   };
 
@@ -48,60 +91,186 @@ export default function HomeScreen({ user, orders, onRequestSurvey, onSelectOrde
       </section>
 
       {/* Action Box: Form Pemesanan */}
-      <section className="bg-white dark:bg-zinc-900/40 border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 md:p-8 relative overflow-hidden group shadow-sm dark:shadow-level-2 transition-all duration-300">
+      <section className="bg-white dark:bg-zinc-900/40 border border-zinc-200/90 dark:border-zinc-800 rounded-3xl p-6 md:p-8 relative overflow-hidden group shadow-sm dark:shadow-level-2 transition-all duration-300 space-y-6">
         {/* Ambient Glow effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         
-        <form className="relative z-10 space-y-6" onSubmit={handleRequestClick}>
-          {/* Location Input */}
-          <div>
-            <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="lokasi">
-              Link Google Maps atau Nama Kos
-            </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-xl">location_on</span>
-              <input 
-                id="lokasi"
-                value={gmapsLink}
-                onChange={(e) => {
-                  setGmapsLink(e.target.value);
-                  if (e.target.value) setErrorMsg('');
-                }}
-                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-4 text-sm md:text-base text-zinc-950 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none"
-                placeholder="Masukkan Link Google Maps atau Nama Kos"
-                type="text"
-              />
-            </div>
-            {errorMsg && (
-              <p className="text-red-500 dark:text-red-400 text-xs font-semibold mt-1">{errorMsg}</p>
-            )}
-          </div>
+        {/* Segmented Control Switcher */}
+        <div className="relative z-10 flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-2xl border border-zinc-200/60 dark:border-zinc-850 max-w-md transition-all duration-300">
+          <button
+            type="button"
+            onClick={() => {
+              setFormTab('existing');
+              setErrorMsg('');
+            }}
+            className={`flex-1 py-3 text-center text-xs md:text-sm font-bold rounded-xl transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${
+              formTab === 'existing'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-800/80'
+                : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg align-middle">location_on</span>
+            <span>Sudah Ada Target</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFormTab('discover');
+              setErrorMsg('');
+            }}
+            className={`flex-1 py-3 text-center text-xs md:text-sm font-bold rounded-xl transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${
+              formTab === 'discover'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-800/80'
+                : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg align-middle">travel_explore</span>
+            <span>Carikan Saya Kos</span>
+          </button>
+        </div>
 
-          {/* Special Notes Textarea */}
-          <div>
-            <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="catatan">
-              Catatan Khusus (Hal Penting yang Perlu Dicek)
-            </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-4 text-zinc-400 dark:text-zinc-500 text-xl">notes</span>
-              <textarea 
-                id="catatan"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-4 text-sm md:text-base text-zinc-950 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all resize-none outline-none"
-                placeholder="Contoh: Tolong cek sinyal Telkomsel di dalam kamar, kebersihan kamar mandi, dan ventilasi udara."
-                rows={3}
-              />
-            </div>
-          </div>
+        <form className="relative z-10 space-y-6" onSubmit={handleRequestClick}>
+          {formTab === 'existing' ? (
+            <>
+              {/* Location Input */}
+              <div>
+                <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="lokasi">
+                  Link Google Maps atau Nama Kos
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-xl">location_on</span>
+                  <input 
+                    id="lokasi"
+                    value={gmapsLink}
+                    onChange={(e) => {
+                      setGmapsLink(e.target.value);
+                      if (e.target.value) setErrorMsg('');
+                    }}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-4 text-sm md:text-base text-zinc-950 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none"
+                    placeholder="Masukkan Link Google Maps atau Nama Kos"
+                    type="text"
+                  />
+                </div>
+              </div>
+
+              {/* Special Notes Textarea */}
+              <div>
+                <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="catatan">
+                  Catatan Khusus (Hal Penting yang Perlu Dicek)
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-4 top-4 text-zinc-400 dark:text-zinc-500 text-xl">notes</span>
+                  <textarea 
+                    id="catatan"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-4 text-sm md:text-base text-zinc-950 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all resize-none outline-none"
+                    placeholder="Contoh: Tolong cek sinyal Telkomsel di dalam kamar, kebersihan kamar mandi, dan ventilasi udara."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Campus Area & Budget selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="campusArea">
+                    Area Kampus Terdekat
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-xl pointer-events-none">school</span>
+                    <select
+                      id="campusArea"
+                      value={campusArea}
+                      onChange={(e) => {
+                        setCampusArea(e.target.value);
+                        if (e.target.value) setErrorMsg('');
+                      }}
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-10 text-sm md:text-base text-zinc-950 dark:text-white focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Pilih Area Kampus</option>
+                      <option value="Universitas Lampung (UNILA)">Universitas Lampung (UNILA)</option>
+                      <option value="Institut Teknologi Sumatera (ITERA)">Institut Teknologi Sumatera (ITERA)</option>
+                      <option value="UIN Raden Intan Lampung">UIN Raden Intan Lampung</option>
+                      <option value="Universitas Bandar Lampung (UBL)">Universitas Bandar Lampung (UBL)</option>
+                      <option value="IBI Darmajaya">IBI Darmajaya</option>
+                      <option value="Universitas Teknokrat Indonesia">Universitas Teknokrat Indonesia</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550 pointer-events-none">expand_more</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 transition-colors duration-300" htmlFor="budgetRange">
+                    Rentang Budget Bulanan
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 text-xl pointer-events-none">payments</span>
+                    <select
+                      id="budgetRange"
+                      value={budgetRange}
+                      onChange={(e) => {
+                        setBudgetRange(e.target.value);
+                        if (e.target.value) setErrorMsg('');
+                      }}
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/80 rounded-xl py-4 pl-12 pr-10 text-sm md:text-base text-zinc-950 dark:text-white focus:border-blue-500/80 focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Pilih Rentang Budget</option>
+                      <option value="Di bawah Rp 500.000 / bulan">Di bawah Rp 500.000 / bulan</option>
+                      <option value="Rp 500.000 - Rp 1.000.000 / bulan">Rp 500.000 - Rp 1.000.000 / bulan</option>
+                      <option value="Rp 1.000.000 - Rp 1.500.000 / bulan">Rp 1.000.000 - Rp 1.500.000 / bulan</option>
+                      <option value="Rp 1.500.000 - Rp 2.000.000 / bulan">Rp 1.500.000 - Rp 2.000.000 / bulan</option>
+                      <option value="Di atas Rp 2.000.000 / bulan">Di atas Rp 2.000.000 / bulan</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550 pointer-events-none">expand_more</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-select Facilities */}
+              <div>
+                <label className="block font-bold text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-3 transition-colors duration-300">
+                  Fasilitas Kost Prioritas (Multi-select)
+                </label>
+                <div className="flex flex-wrap gap-2.5">
+                  {facilityOptions.map((facility) => {
+                    const isSelected = selectedFacilities.includes(facility);
+                    return (
+                      <button
+                        key={facility}
+                        type="button"
+                        onClick={() => toggleFacility(facility)}
+                        className={`px-4 py-2 text-xs md:text-sm font-semibold rounded-full border transition-all duration-300 cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs ${
+                          isSelected
+                            ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-500'
+                            : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                        }`}
+                      >
+                        {isSelected && <span className="material-symbols-outlined text-xs align-middle">check_circle</span>}
+                        <span>{facility}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {errorMsg && (
+            <p className="text-red-550 dark:text-red-400 text-xs font-semibold mt-1">{errorMsg}</p>
+          )}
 
           {/* Primary Action Button */}
           <button 
             type="submit"
             className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-500 hover:to-indigo-550 text-white font-extrabold uppercase tracking-widest text-[11px] md:text-xs py-4.5 px-10 rounded-full hover:shadow-[0_0_30px_rgba(59,130,246,0.45)] active:scale-95 transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer group/btn"
           >
-            <span className="material-symbols-outlined filled text-lg group-hover/btn:translate-x-0.5 transition-transform duration-300">person_search</span>
-            <span>Minta Survei Sekarang</span>
+            <span className="material-symbols-outlined filled text-lg group-hover/btn:translate-x-0.5 transition-transform duration-300">
+              {formTab === 'existing' ? 'person_search' : 'travel_explore'}
+            </span>
+            <span>{formTab === 'existing' ? 'Minta Survei Sekarang' : 'Carikan Saya Kos'}</span>
           </button>
         </form>
       </section>
