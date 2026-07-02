@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { ActiveTab, Order, OrderStatus, UserProfile } from './types';
-import { INITIAL_ORDERS } from './initialData';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import HomeScreen from './components/HomeScreen';
@@ -14,12 +13,7 @@ import { api } from './services/api';
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
-
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('matakost_orders');
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-  });
-
+  const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('masuk');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
@@ -31,6 +25,11 @@ export default function App() {
         try {
           const data = await api.getMe();
           setUser(data.user);
+
+          // Fetch orders from database
+          const ordersData = await api.getOrders();
+          setOrders(ordersData.orders);
+
           setActiveTab('beranda');
         } catch (error) {
           console.error('Verifikasi sesi gagal:', error);
@@ -47,14 +46,11 @@ export default function App() {
     checkSession();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('matakost_orders', JSON.stringify(orders));
-  }, [orders]);
-
   // Handle logging out
   const handleLogout = () => {
     api.clearToken();
     setUser(null);
+    setOrders([]);
     setActiveTab('masuk');
   };
 
@@ -64,85 +60,58 @@ export default function App() {
   };
 
   // Handle order creation
-  const handleRequestSurvey = (gmapsLink: string, notes: string) => {
-    // Determine location name from the maps input or give a standard one
-    let location = 'Bandar Lampung';
-    let title = 'Kos Pilihan Baru';
-
-    const lowerLink = gmapsLink.toLowerCase();
-    if (lowerLink.includes('yogyakarta') || lowerLink.includes('jogja')) {
-      location = 'Yogyakarta';
-      title = 'Kos Bahagia Indah';
-    } else if (lowerLink.includes('jakarta')) {
-      location = 'Jakarta Selatan';
-      title = 'Kos Premium Setiabudi';
-    } else if (lowerLink.includes('bandung')) {
-      location = 'Bandung';
-      title = 'Kos Mahasiswa Dago';
-    } else {
-      // Extract name from name input
-      title = gmapsLink.trim().length < 30 ? gmapsLink.trim() : 'Kos Pilihan Baru';
+  const handleRequestSurvey = async (gmapsLink: string, notes: string) => {
+    try {
+      const data = await api.createOrder(gmapsLink, notes);
+      setOrders(prevOrders => [data.order, ...prevOrders]);
+      setSelectedOrderId(data.order.id);
+      setActiveTab('lacak');
+    } catch (error: any) {
+      console.error("Gagal membuat pesanan survei:", error);
+      alert("Gagal memproses pesanan: " + (error.message || "Terjadi kesalahan"));
     }
-
-    const newId = `MK-${Math.floor(10000 + Math.random() * 90000)}-BL`;
-    const newOrder: Order = {
-      id: newId,
-      title: title,
-      location: location,
-      imageUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBxAaLzkQ8B6Hl1dCF5kN-gWlW7PDcajpam160Rlet68wgFRLaNuyKc1aoLA7KFNEQ6mAQvAdO8sb34PuJI0H-3ZAojssPD-RkseSkzs5KFvs4nHW0Sfe-ntqvoxCeJiRDGaDIOty-KcQgtugUje1xnXOYMid_ATiVcBTKu3FPB1JvhQ1VSZ3J8IfE2xf7-kKpdR1_VuVoEkkMZZcyLA9HyJsnvIAe4FRW_8Tn2uUZGUwzV3nm-vAKkvDsNdDJplnWLGBjg7P5V6wwW",
-      status: 'created',
-      statusLabel: 'Sedang Disurvei',
-      gmapsLink: gmapsLink,
-      notes: notes,
-      createdAt: new Date().toISOString(),
-      surveyor: {
-        name: "Budi Santoso",
-        avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCYs9ycCu9MJEhLaik7H6XdKmEj4cKB-ExqG1D1yRsgYZlyUX9hXotnOCpPX201rJs7r-WbsI3-1h6bAIHNiz2Mr7_bRjrkYCX_Oh_P61z43j5jTz03QpDqf3O24G4sRagvG-UjQlXcOUZKfdDk_0F6JJSSXHTVkOTHwgBWXLd8ZxcC8vq9CaCXpHVvh94fbwkYh80gAYkWM8aCCoA5tGievJJdYlU1iNFn-_yGPOOjuEzLrJvCejVYxkPNWdZdKRDMB7Rt1QCOfYNv",
-        whatsappNumber: "+6281234567890"
-      },
-      report: null
-    };
-
-    setOrders([newOrder, ...orders]);
-    setSelectedOrderId(newId);
-    setActiveTab('lacak');
   };
 
   // Handle status updates from simulator
-  const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
-    setOrders(prevOrders => 
-      prevOrders.map(o => {
-        if (o.id !== orderId) return o;
+  const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
+    let statusLabel = 'Sedang Disurvei';
+    if (status === 'completed') statusLabel = 'Laporan Selesai';
 
-        let statusLabel = 'Sedang Disurvei';
-        if (status === 'completed') statusLabel = 'Laporan Selesai';
+    const existingOrder = orders.find(o => o.id === orderId);
+    let report = existingOrder?.report || null;
+    if (status === 'completed' && !report) {
+      report = {
+        score: Math.floor(82 + Math.random() * 16),
+        recommendation: "SANGAT DIREKOMENDASIKAN",
+        waterQuality: {
+          status: "Aman",
+          description: "Jernih, Aliran Deras & Bebas Bau"
+        },
+        cellularSignal: "Telkomsel (Penuh), Indosat (Penuh)",
+        wifiSpeed: "35 Mbps (Sangat Cepat untuk Streaming)",
+        hiddenCosts: "Listrik Token Mandiri, Air Bersih Gratis",
+        virtualTourBg: "https://lh3.googleusercontent.com/aida-public/AB6AXuAI6hjxK0D-KpgBymHGMmYYDMYuR0PLxSWarDOv0oas7C6GkDhfV9o1X_Cg9vcTIdFtAxuvtPDUWAGgqPv4giulOXb32QsSv94GSZS1p7n8cUT9ByFNJ2Zik3lnS-mYbl4015zPFjaRGn3NB8etBLX5dbkOh5zEDoNQ2B4wgzRRb3gkD7rONlY1pl2Ds5Q_wbUi3LbrNJylLhD76lR0BJrMQYZAjt7usHTmkaMoVRaFXdbmh_dbqe9G7XSwNjYBJ7z-u8v3FEInAahx",
+        surveyDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+      };
+    }
 
-        // Auto-generate report when state reaches completed
-        let report = o.report;
-        if (status === 'completed' && !report) {
-          report = {
-            score: Math.floor(82 + Math.random() * 16), // Random score between 82 and 98
-            recommendation: "SANGAT DIREKOMENDASIKAN",
-            waterQuality: {
-              status: "Aman",
-              description: "Jernih, Aliran Deras & Bebas Bau"
-            },
-            cellularSignal: "Telkomsel (Penuh), Indosat (Penuh)",
-            wifiSpeed: "35 Mbps (Sangat Cepat untuk Streaming)",
-            hiddenCosts: "Listrik Token Mandiri, Air Bersih Gratis",
-            virtualTourBg: "https://lh3.googleusercontent.com/aida-public/AB6AXuAI6hjxK0D-KpgBymHGMmYYDMYuR0PLxSWarDOv0oas7C6GkDhfV9o1X_Cg9vcTIdFtAxuvtPDUWAGgqPv4giulOXb32QsSv94GSZS1p7n8cUT9ByFNJ2Zik3lnS-mYbl4015zPFjaRGn3NB8etBLX5dbkOh5zEDoNQ2B4wgzRRb3gkD7rONlY1pl2Ds5Q_wbUi3LbrNJylLhD76lR0BJrMQYZAjt7usHTmkaMoVRaFXdbmh_dbqe9G7XSwNjYBJ7z-u8v3FEInAahx",
-            surveyDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+    try {
+      await api.updateOrderStatus(orderId, status, statusLabel, report);
+      
+      setOrders(prevOrders => 
+        prevOrders.map(o => {
+          if (o.id !== orderId) return o;
+          return {
+            ...o,
+            status,
+            statusLabel,
+            report
           };
-        }
-
-        return {
-          ...o,
-          status,
-          statusLabel,
-          report
-        };
-      })
-    );
+        })
+      );
+    } catch (error) {
+      console.error("Gagal memperbarui status di database:", error);
+    }
   };
 
   const handleSelectOrder = (orderId: string) => {
@@ -191,6 +160,11 @@ export default function App() {
         {!user || activeTab === 'masuk' ? (
           <LoginScreen onLoginSuccess={(loggedInUser) => {
             setUser(loggedInUser);
+            api.getOrders().then(ordersData => {
+              setOrders(ordersData.orders);
+            }).catch(err => {
+              console.error("Gagal mengambil pesanan setelah login:", err);
+            });
             setActiveTab('beranda');
           }} />
         ) : (

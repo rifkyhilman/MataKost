@@ -66,5 +66,43 @@ export const api = {
       throw new Error(data.error || 'Google Login gagal');
     }
     return data; // returns { message, token, user }
+  },
+
+  async getOrders() {
+    const res = await fetch('/api/orders', {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Gagal mengambil pesanan');
+    }
+    return data; // returns { orders }
+  },
+
+  async createOrder(gmapsLink: string, notes: string) {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ gmapsLink, notes }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Gagal membuat pesanan');
+    }
+    return data; // returns { order }
+  },
+
+  async updateOrderStatus(id: string, status: string, statusLabel: string, report: any) {
+    const res = await fetch(`/api/orders/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, statusLabel, report }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Gagal memperbarui status');
+    }
+    return data;
   }
 };
