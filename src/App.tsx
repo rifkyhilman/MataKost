@@ -177,15 +177,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
       {/* Top Desktop Navigation Bar */}
-      <Header 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        user={user} 
-        onLogout={handleLogout}
-      />
+      {user && activeTab !== 'masuk' && (
+        <Header 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          user={user} 
+          onLogout={handleLogout}
+        />
+      )}
 
       {/* Main Canvas Area */}
-      <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-8 pb-24 md:pb-8">
+      <main className={`flex-grow w-full ${user && activeTab !== 'masuk' ? 'max-w-7xl mx-auto px-6 py-8 pb-24 md:pb-8' : 'px-0 py-0'}`}>
         {!user || activeTab === 'masuk' ? (
           <LoginScreen onLoginSuccess={(loggedInUser) => {
             setUser(loggedInUser);
@@ -239,11 +241,13 @@ export default function App() {
       </main>
 
       {/* Sticky Bottom Navigation for Mobile */}
-      <BottomNav 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        user={user} 
-      />
+      {user && activeTab !== 'masuk' && (
+        <BottomNav 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          user={user} 
+        />
+      )}
 
       {/* Desktop Footer */}
       {activeTab !== 'masuk' && user && <Footer />}

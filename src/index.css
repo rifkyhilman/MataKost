@@ -121,13 +121,5 @@ body {
   animation: dash 2s ease-out forwards;
 }
 
-.floating-input:focus ~ .floating-label,
-.floating-input:not(:placeholder-shown) ~ .floating-label {
-  transform: translateY(-8px) scale(0.75);
-  color: #3b82f6; /* primary color */
-}
 
-.floating-input:not(:focus):not(:placeholder-shown) ~ .floating-label {
-  color: #a1a1aa; /* on-surface-variant */
-}
 
